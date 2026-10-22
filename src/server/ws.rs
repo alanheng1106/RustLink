@@ -4,7 +4,7 @@ use axum::{
         State,
     },
     http::{HeaderMap, StatusCode},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
@@ -21,15 +21,19 @@ pub async fn ws_handler(
     ws: WebSocketUpgrade,
     headers: HeaderMap,
     State(state): State<AppState>,
-) -> Result<Response, StatusCode> {
+) -> Response {
     // 1. Auth check
     let auth = headers
         .get("authorization")
         .and_then(|h| h.to_str().ok());
 
     if auth != Some(&*state.password) {
-        warn!("Unauthorized WebSocket connection attempt");
-        return Err(StatusCode::UNAUTHORIZED);
+        warn!(
+            expected = %state.password,
+            received = ?auth,
+            "Unauthorized WebSocket connection attempt: password mismatch"
+        );
+        return StatusCode::UNAUTHORIZED.into_response();
     }
 
     let user_id = headers
@@ -62,7 +66,8 @@ pub async fn ws_handler(
 
     let state_clone = state.clone();
 
-    Ok(ws.on_upgrade(move |socket| handle_socket(socket, session, state_clone, resumed)))
+    ws.on_upgrade(move |socket| handle_socket(socket, session, state_clone, resumed))
+        .into_response()
 }
 
 async fn handle_socket(
@@ -122,17 +127,22 @@ async fn handle_socket(
     });
 
     // Listen for incoming WebSocket messages (heartbeats, close frames, etc.)
-    while let Some(Ok(msg)) = ws_receiver.next().await {
-        match msg {
-            Message::Close(_) => {
-                info!(session_id = %session.session_id, "Client sent WebSocket close frame");
+    while let Some(msg_result) = ws_receiver.next().await {
+        match msg_result {
+            Ok(Message::Close(frame)) => {
+                let code = frame.as_ref().map(|f| f.code);
+                let reason = frame.as_ref().map(|f| f.reason.to_string());
+                info!(session_id = %session.session_id, ?code, ?reason, "Client sent WebSocket close frame");
                 break;
             }
-            Message::Ping(_bytes) => {
-                // Axum handles Pong automatically
+            Ok(Message::Text(text)) => {
+                info!(session_id = %session.session_id, "Received WebSocket text from client: {text}");
             }
-            Message::Text(_text) => {
-                // Client may send ping or debug messages
+            Ok(Message::Ping(_)) => {}
+            Ok(Message::Pong(_)) => {}
+            Err(e) => {
+                warn!(session_id = %session.session_id, "WebSocket receive error: {e}");
+                break;
             }
             _ => {}
         }

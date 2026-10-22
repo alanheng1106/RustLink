@@ -178,6 +178,8 @@ impl AppConfig {
     pub fn get_port(&self) -> u16 {
         env::var("RUSTLINK_SERVER_PORT")
             .or_else(|_| env::var("LAVALINK_SERVER_PORT"))
+            .or_else(|_| env::var("SERVER_PORT"))
+            .or_else(|_| env::var("PORT"))
             .ok()
             .and_then(|p| p.parse::<u16>().ok())
             .unwrap_or(self.server.port)

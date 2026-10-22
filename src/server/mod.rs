@@ -19,6 +19,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/v4/decode", post(rest::decode_single_track))
         .route("/v4/decodetracks", post(rest::decode_multiple_tracks))
         .route("/v4/websocket", get(ws::ws_handler))
+        .route("/websocket", get(ws::ws_handler))
+        .route("/", get(ws::ws_handler))
+        .route("/loadtracks", get(rest::load_tracks))
         .route("/v4/sessions/{session_id}", patch(rest::update_session))
         .route("/v4/sessions/{session_id}/players", get(rest::get_players))
         .route(
