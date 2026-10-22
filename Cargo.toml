@@ -1,0 +1,27 @@
+[package]
+name = "rustlink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+songbird = { version = "0.6", default-features = false, features = ["driver", "rustls", "tungstenite"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures-util = "0.3"
+dashmap = "6"
+base64 = "0.22"
+bytes = "1"
+thiserror = "2"
+async-trait = "0.1"
+byteorder = "1.5"
+url = "2.5"
+uuid = { version = "1", features = ["v4"] }
+parking_lot = "0.12"
+tower = { version = "0.5", features = ["util"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+symphonia = { version = "0.5", features = ["all"] }
