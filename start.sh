@@ -61,5 +61,16 @@ if [ ! -f "$BIN_DIR/yt-dlp" ] || head -n 1 "$BIN_DIR/yt-dlp" 2>/dev/null | grep 
     echo "[+] Standalone yt-dlp installed successfully!"
 fi
 
+# 5. Check or download standalone Deno JS runtime (required by yt-dlp for YouTube signature cipher)
+if ! command -v deno &> /dev/null; then
+    echo "[-] deno not found. Downloading standalone Deno JS runtime for YouTube signature cipher..."
+    curl -sSL "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip" -o "/tmp/deno.zip"
+    mkdir -p /tmp/deno_extract
+    (cd /tmp/deno_extract && cmake -E tar xf /tmp/deno.zip && mv deno "$BIN_DIR/deno")
+    chmod +x "$BIN_DIR/deno"
+    rm -rf /tmp/deno_extract /tmp/deno.zip
+    echo "[+] Deno JS runtime installed successfully!"
+fi
+
 echo "=== [RustLink] Starting Cargo build & run ==="
 exec cargo run --release
