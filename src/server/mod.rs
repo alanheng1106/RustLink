@@ -1,3 +1,4 @@
+pub mod reaper;
 pub mod rest;
 pub mod state;
 pub mod ws;

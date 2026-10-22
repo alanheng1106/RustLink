@@ -313,3 +313,33 @@ fn test_serialize_server_messages() {
     assert!(event_json.contains("\"type\":\"TrackStartEvent\""));
     assert!(event_json.contains("\"guildId\":\"123\""));
 }
+
+#[tokio::test]
+async fn test_session_reaper() {
+    let state = AppState::new("youshallnotpass".to_string());
+    let (session, _) = state.get_or_create_session("reaper-session", None);
+    let _player = state.get_or_create_player(&session, "guild-123");
+    assert_eq!(session.players.len(), 1);
+
+    // 1. Active session is not expired
+    session.mark_connected();
+    assert!(!session.is_expired());
+
+    // 2. Mark disconnected with a short 1-second timeout
+    session.set_resuming(true);
+    session.set_timeout(1);
+    session.mark_disconnected();
+
+    // 3. Immediately after disconnect -> not yet expired
+    assert!(!session.is_expired());
+
+    // 4. Start reaper
+    rustlink::server::reaper::start_session_reaper(state.clone());
+
+    // 5. Wait for timeout (1s) and reaper tick (reaper checks periodically)
+    // We can simulate expiration time by sleeping or checking is_expired
+    tokio::time::sleep(std::time::Duration::from_millis(5200)).await;
+
+    // 6. Session should be reaped from state.sessions!
+    assert!(state.get_session("reaper-session").is_none());
+}

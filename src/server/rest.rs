@@ -100,19 +100,16 @@ pub async fn update_session(
         .get_session(&session_id)
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let mut session_resuming = session.resuming;
-    let mut session_timeout = session.timeout;
-
     if let Some(r) = req.resuming {
-        session_resuming = r;
+        session.set_resuming(r);
     }
     if let Some(t) = req.timeout {
-        session_timeout = t;
+        session.set_timeout(t);
     }
 
     Ok(Json(SessionResponse {
-        resuming: session_resuming,
-        timeout: session_timeout,
+        resuming: session.get_resuming(),
+        timeout: session.get_timeout(),
     }))
 }
 

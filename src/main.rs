@@ -27,6 +27,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sources = config.get_source_list();
 
     let state = AppState::new_with_sources(password.clone(), sources);
+
+    // 4. Start background Session Reaper for zombie session garbage collection
+    rustlink::server::reaper::start_session_reaper(state.clone());
+
     let app = create_router(state);
 
     let addr: SocketAddr = format!("{host}:{port}").parse()?;

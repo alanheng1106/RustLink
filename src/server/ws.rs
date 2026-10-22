@@ -95,6 +95,7 @@ async fn handle_socket(
     }
 
     session.set_sender(Some(tx.clone()));
+    session.mark_connected();
 
     // Forward messages from rx to ws_sender
     let forward_task = tokio::spawn(async move {
@@ -158,6 +159,7 @@ async fn handle_socket(
     ticker_task.abort();
     forward_task.abort();
     session.set_sender(None);
+    session.mark_disconnected();
 
     info!(session_id = %session.session_id, "WebSocket client disconnected");
 }
