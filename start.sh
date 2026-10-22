@@ -61,16 +61,20 @@ if [ ! -f "$BIN_DIR/yt-dlp" ] || head -n 1 "$BIN_DIR/yt-dlp" 2>/dev/null | grep 
     echo "[+] Standalone yt-dlp installed successfully!"
 fi
 
-# 5. Check or download standalone Deno JS runtime (required by yt-dlp for YouTube signature cipher)
-if ! command -v deno &> /dev/null; then
-    echo "[-] deno not found. Downloading standalone Deno JS runtime for YouTube signature cipher..."
-    curl -sSL "https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip" -o "/tmp/deno.zip"
-    mkdir -p /tmp/deno_extract
-    (cd /tmp/deno_extract && cmake -E tar xf /tmp/deno.zip && mv deno "$BIN_DIR/deno")
-    chmod +x "$BIN_DIR/deno"
-    rm -rf /tmp/deno_extract /tmp/deno.zip
-    echo "[+] Deno JS runtime installed successfully!"
+# 5. Check or download standalone QuickJS runtime (2.5MB standalone JS runtime for YouTube cipher)
+if ! command -v qjs &> /dev/null; then
+    echo "[-] qjs not found. Downloading standalone QuickJS runtime for YouTube signature cipher..."
+    curl -sSL "https://github.com/quickjs-ng/quickjs/releases/download/v0.17.0/qjs-linux-x86_64" -o "$BIN_DIR/qjs"
+    chmod +x "$BIN_DIR/qjs"
+    echo "[+] QuickJS runtime installed successfully!"
 fi
+
+# Configure yt-dlp to use QuickJS and enable GitHub EJS scripts
+mkdir -p "$HOME/.config/yt-dlp"
+cat > "$HOME/.config/yt-dlp/config" << 'EOF'
+--js-runtimes quickjs
+--remote-components ejs:github
+EOF
 
 echo "=== [RustLink] Starting Cargo build & run ==="
 exec cargo run --release

@@ -17,6 +17,15 @@ fn is_youtube_url(uri: &str) -> bool {
         || lower.starts_with("http://music.youtube.com/")
 }
 
+fn ytdl_args() -> Vec<String> {
+    vec![
+        "--js-runtimes".to_string(),
+        "quickjs".to_string(),
+        "--remote-components".to_string(),
+        "ejs:github".to_string(),
+    ]
+}
+
 #[derive(Clone)]
 pub struct SourceManager {
     client: Client,
@@ -61,7 +70,8 @@ impl SourceManager {
 
     async fn resolve_yt_search(&self, query: &str) -> LoadResult {
         let clean_query = query.strip_prefix("ytsearch:").unwrap_or(query).trim();
-        let mut ytdl = songbird::input::YoutubeDl::new_search(self.client.clone(), clean_query.to_string());
+        let mut ytdl = songbird::input::YoutubeDl::new_search(self.client.clone(), clean_query.to_string())
+            .user_args(ytdl_args());
 
         match ytdl.search(Some(10)).await {
             Ok(results) => {
@@ -115,7 +125,8 @@ impl SourceManager {
     }
 
     async fn resolve_youtube_url(&self, url: &str) -> LoadResult {
-        let mut ytdl = songbird::input::YoutubeDl::new(self.client.clone(), url.to_string());
+        let mut ytdl = songbird::input::YoutubeDl::new(self.client.clone(), url.to_string())
+            .user_args(ytdl_args());
 
         match ytdl.aux_metadata().await {
             Ok(meta) => {
@@ -244,7 +255,8 @@ impl SourceManager {
 
         // 1. YouTube or ytsearch
         if is_youtube_url(trimmed) || trimmed.starts_with("ytsearch:") {
-            let ytdl = songbird::input::YoutubeDl::new(self.client.clone(), trimmed.to_string());
+            let ytdl = songbird::input::YoutubeDl::new(self.client.clone(), trimmed.to_string())
+                .user_args(ytdl_args());
             return Some(ytdl.into());
         }
 
