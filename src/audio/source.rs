@@ -1,5 +1,4 @@
 use reqwest::Client;
-use songbird::input::Compose;
 use std::path::Path;
 use url::Url;
 use crate::audio::codec::encode_track;
@@ -24,6 +23,22 @@ fn ytdl_args() -> Vec<String> {
         "--remote-components".to_string(),
         "ejs:github".to_string(),
     ]
+}
+
+#[derive(serde::Deserialize)]
+struct YtDlpThumbnail {
+    url: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct YtDlpFlatEntry {
+    id: Option<String>,
+    url: Option<String>,
+    title: Option<String>,
+    duration: Option<f64>,
+    uploader: Option<String>,
+    channel: Option<String>,
+    thumbnails: Option<Vec<YtDlpThumbnail>>,
 }
 
 #[derive(Clone)]
@@ -70,41 +85,53 @@ impl SourceManager {
 
     async fn resolve_yt_search(&self, query: &str) -> LoadResult {
         let clean_query = query.strip_prefix("ytsearch:").unwrap_or(query).trim();
-        let mut ytdl = songbird::input::YoutubeDl::new_search(self.client.clone(), clean_query.to_string())
-            .user_args(ytdl_args());
+        let search_target = format!("ytsearch10:{clean_query}");
 
-        match ytdl.search(Some(10)).await {
-            Ok(results) => {
+        let output_res = tokio::process::Command::new("yt-dlp")
+            .args(["--flat-playlist", "-j", &search_target, "--no-playlist"])
+            .output()
+            .await;
+
+        match output_res {
+            Ok(output) if output.status.success() => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
                 let mut tracks = Vec::new();
-                for meta in results {
-                    let title = meta.title.unwrap_or_else(|| "Unknown Title".to_string());
-                    let author = meta.channel.or(meta.artist).unwrap_or_else(|| "Unknown Artist".to_string());
-                    let length = meta.duration.map(|d| d.as_millis() as u64).unwrap_or(0);
-                    let uri = meta.source_url;
-                    let artwork_url = meta.thumbnail;
-                    let identifier = uri.clone().unwrap_or_else(|| clean_query.to_string());
 
-                    let info = TrackInfo {
-                        identifier,
-                        is_seekable: true,
-                        author,
-                        length,
-                        is_stream: false,
-                        position: 0,
-                        title,
-                        uri,
-                        artwork_url,
-                        isrc: None,
-                        source_name: "youtube".to_string(),
-                    };
+                for line in stdout.lines() {
+                    let trimmed_line = line.trim();
+                    if trimmed_line.is_empty() {
+                        continue;
+                    }
+                    if let Ok(entry) = serde_json::from_str::<YtDlpFlatEntry>(trimmed_line) {
+                        let video_id = entry.id.unwrap_or_default();
+                        let video_url = entry.url.unwrap_or_else(|| format!("https://www.youtube.com/watch?v={video_id}"));
+                        let title = entry.title.unwrap_or_else(|| "Unknown Title".to_string());
+                        let author = entry.uploader.or(entry.channel).unwrap_or_else(|| "YouTube".to_string());
+                        let length = entry.duration.map(|d| (d * 1000.0) as u64).unwrap_or(0);
+                        let artwork_url = entry.thumbnails.and_then(|t| t.into_iter().next_back().and_then(|x| x.url));
 
-                    let encoded = encode_track(&info);
-                    tracks.push(Track {
-                        encoded,
-                        info,
-                        plugin_info: serde_json::json!({}),
-                        user_data: serde_json::json!({}),
-                    });
+                        let info = TrackInfo {
+                            identifier: video_id,
+                            is_seekable: true,
+                            author,
+                            length,
+                            is_stream: false,
+                            position: 0,
+                            title,
+                            uri: Some(video_url),
+                            artwork_url,
+                            isrc: None,
+                            source_name: "youtube".to_string(),
+                        };
+
+                        let encoded = encode_track(&info);
+                        tracks.push(Track {
+                            encoded,
+                            info,
+                            plugin_info: serde_json::json!({}),
+                            user_data: serde_json::json!({}),
+                        });
+                    }
                 }
 
                 if tracks.is_empty() {
@@ -113,57 +140,84 @@ impl SourceManager {
                     LoadResult::Search(tracks)
                 }
             }
-            Err(e) => {
-                tracing::warn!("YouTube search failed: {e:?}");
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::warn!("yt-dlp search non-zero: {stderr}");
                 LoadResult::Error(ExceptionData {
-                    message: format!("YouTube search failed: {e}"),
+                    message: format!("YouTube search failed: {stderr}"),
                     severity: "common".to_string(),
-                    cause: format!("{e:?}"),
+                    cause: stderr.to_string(),
+                })
+            }
+            Err(e) => {
+                tracing::warn!("Failed to spawn yt-dlp: {e}");
+                LoadResult::Error(ExceptionData {
+                    message: format!("Failed to spawn yt-dlp: {e}"),
+                    severity: "common".to_string(),
+                    cause: e.to_string(),
                 })
             }
         }
     }
 
     async fn resolve_youtube_url(&self, url: &str) -> LoadResult {
-        let mut ytdl = songbird::input::YoutubeDl::new(self.client.clone(), url.to_string())
-            .user_args(ytdl_args());
+        let output_res = tokio::process::Command::new("yt-dlp")
+            .args(["--flat-playlist", "-j", url, "--no-playlist"])
+            .output()
+            .await;
 
-        match ytdl.aux_metadata().await {
-            Ok(meta) => {
-                let title = meta.title.unwrap_or_else(|| "YouTube Video".to_string());
-                let author = meta.channel.or(meta.artist).unwrap_or_else(|| "YouTube".to_string());
-                let length = meta.duration.map(|d| d.as_millis() as u64).unwrap_or(0);
-                let uri = meta.source_url.or_else(|| Some(url.to_string()));
-                let artwork_url = meta.thumbnail;
+        match output_res {
+            Ok(output) if output.status.success() => {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(line) = stdout.lines().find(|l| !l.trim().is_empty()) {
+                    if let Ok(entry) = serde_json::from_str::<YtDlpFlatEntry>(line.trim()) {
+                        let video_id = entry.id.unwrap_or_else(|| url.to_string());
+                        let video_url = entry.url.unwrap_or_else(|| url.to_string());
+                        let title = entry.title.unwrap_or_else(|| "YouTube Video".to_string());
+                        let author = entry.uploader.or(entry.channel).unwrap_or_else(|| "YouTube".to_string());
+                        let length = entry.duration.map(|d| (d * 1000.0) as u64).unwrap_or(0);
+                        let artwork_url = entry.thumbnails.and_then(|t| t.into_iter().next_back().and_then(|x| x.url));
 
-                let info = TrackInfo {
-                    identifier: url.to_string(),
-                    is_seekable: true,
-                    author,
-                    length,
-                    is_stream: false,
-                    position: 0,
-                    title,
-                    uri,
-                    artwork_url,
-                    isrc: None,
-                    source_name: "youtube".to_string(),
-                };
+                        let info = TrackInfo {
+                            identifier: video_id,
+                            is_seekable: true,
+                            author,
+                            length,
+                            is_stream: false,
+                            position: 0,
+                            title,
+                            uri: Some(video_url),
+                            artwork_url,
+                            isrc: None,
+                            source_name: "youtube".to_string(),
+                        };
 
-                let encoded = encode_track(&info);
-                LoadResult::Track(Track {
-                    encoded,
-                    info,
-                    plugin_info: serde_json::json!({}),
-                    user_data: serde_json::json!({}),
+                        let encoded = encode_track(&info);
+                        return LoadResult::Track(Track {
+                            encoded,
+                            info,
+                            plugin_info: serde_json::json!({}),
+                            user_data: serde_json::json!({}),
+                        });
+                    }
+                }
+                LoadResult::Empty(serde_json::json!({}))
+            }
+            Ok(output) => {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                tracing::warn!("yt-dlp url resolution non-zero: {stderr}");
+                LoadResult::Error(ExceptionData {
+                    message: format!("Failed to extract YouTube video: {stderr}"),
+                    severity: "common".to_string(),
+                    cause: stderr.to_string(),
                 })
             }
             Err(e) => {
-                tracing::warn!("YouTube metadata extraction failed: {e:?}");
+                tracing::warn!("Failed to spawn yt-dlp: {e}");
                 LoadResult::Error(ExceptionData {
-                    message: format!("Failed to extract YouTube video: {e}"),
+                    message: format!("Failed to spawn yt-dlp: {e}"),
                     severity: "common".to_string(),
-                    cause: format!("{e:?}"),
+                    cause: e.to_string(),
                 })
             }
         }

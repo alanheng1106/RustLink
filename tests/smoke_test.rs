@@ -153,6 +153,17 @@ async fn test_youtube_source_input() {
     let yt_search = "ytsearch:never gonna give you up";
     let input3 = source_manager.create_input(yt_search);
     assert!(input3.is_some());
+
+    // 4. Test real fast flat search
+    let search_res = source_manager.resolve("ytsearch:baby").await;
+    match search_res {
+        rustlink::model::protocol::LoadResult::Search(tracks) => {
+            println!("Successfully searched and found {} tracks!", tracks.len());
+            assert!(!tracks.is_empty());
+            assert!(tracks[0].info.title.to_lowercase().contains("baby"));
+        }
+        other => panic!("Expected LoadResult::Search, got: {:?}", other),
+    }
 }
 
 #[test]
