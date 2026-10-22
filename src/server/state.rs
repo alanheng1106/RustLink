@@ -35,7 +35,7 @@ impl AppState {
     pub fn new_with_sources(password: String, sources: Vec<String>) -> Self {
         Self {
             sessions: Arc::new(DashMap::new()),
-            source_manager: Arc::new(SourceManager::new()),
+            source_manager: Arc::new(SourceManager::with_enabled(&sources)),
             password: Arc::new(password),
             enabled_sources: Arc::new(sources),
             start_time: Instant::now(),

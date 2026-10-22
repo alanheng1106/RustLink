@@ -166,6 +166,68 @@ async fn test_youtube_source_input() {
     }
 }
 
+#[tokio::test]
+async fn test_custom_audio_source_plugin() {
+    use async_trait::async_trait;
+    use rustlink::audio::sources::AudioSource;
+    use rustlink::model::protocol::{LoadResult, Track, TrackInfo};
+
+    struct MockPluginSource;
+
+    #[async_trait]
+    impl AudioSource for MockPluginSource {
+        fn name(&self) -> &'static str {
+            "mock-plugin"
+        }
+
+        fn can_handle(&self, identifier: &str) -> bool {
+            identifier.starts_with("mock:")
+        }
+
+        async fn resolve(&self, identifier: &str) -> Option<LoadResult> {
+            let song_id = identifier.strip_prefix("mock:").unwrap_or(identifier);
+            let info = TrackInfo {
+                identifier: identifier.to_string(),
+                is_seekable: true,
+                author: "Mock Artist".to_string(),
+                length: 60000,
+                is_stream: false,
+                position: 0,
+                title: format!("Mock Title ({song_id})"),
+                uri: Some(identifier.to_string()),
+                artwork_url: None,
+                isrc: None,
+                source_name: "mock-plugin".to_string(),
+            };
+            let encoded = rustlink::audio::codec::encode_track(&info);
+            Some(LoadResult::Track(Track {
+                encoded,
+                info,
+                plugin_info: serde_json::json!({}),
+                user_data: serde_json::json!({}),
+            }))
+        }
+
+        fn create_input(&self, _identifier: &str) -> Option<songbird::input::Input> {
+            None
+        }
+    }
+
+    let mut manager = rustlink::audio::source::SourceManager::new();
+    manager.register_source(MockPluginSource);
+
+    // Verify resolving custom mock plugin prefix
+    let result = manager.resolve("mock:hello_world").await;
+    match result {
+        LoadResult::Track(track) => {
+            assert_eq!(track.info.author, "Mock Artist");
+            assert_eq!(track.info.title, "Mock Title (hello_world)");
+            assert_eq!(track.info.source_name, "mock-plugin");
+        }
+        other => panic!("Expected LoadResult::Track, got {:?}", other),
+    }
+}
+
 #[test]
 fn test_config_parsing() {
     let yaml = r#"
