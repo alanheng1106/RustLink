@@ -88,6 +88,12 @@ async fn handle_socket(
         let _ = ws_sender.send(Message::Text(json.into())).await;
     }
 
+    // Send initial Stats immediately
+    let initial_stats = state.stats();
+    if let Ok(json) = serde_json::to_string(&ServerMessage::Stats(initial_stats)) {
+        let _ = ws_sender.send(Message::Text(json.into())).await;
+    }
+
     session.set_sender(Some(tx.clone()));
 
     // Forward messages from rx to ws_sender

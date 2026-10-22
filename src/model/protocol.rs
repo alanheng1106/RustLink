@@ -206,10 +206,12 @@ pub struct SessionResponse {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub enum ServerMessage {
+    #[serde(rename_all = "camelCase")]
     Ready {
         resumed: bool,
         session_id: String,
     },
+    #[serde(rename_all = "camelCase")]
     PlayerUpdate {
         guild_id: String,
         state: PlayerState,
@@ -219,27 +221,32 @@ pub enum ServerMessage {
 }
 
 #[derive(Debug, Clone, Serialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type")]
 pub enum ServerEvent {
+    #[serde(rename_all = "camelCase")]
     TrackStartEvent {
         guild_id: String,
         track: Track,
     },
+    #[serde(rename_all = "camelCase")]
     TrackEndEvent {
         guild_id: String,
         track: Track,
         reason: String,
     },
+    #[serde(rename_all = "camelCase")]
     TrackExceptionEvent {
         guild_id: String,
         track: Track,
         exception: ExceptionData,
     },
+    #[serde(rename_all = "camelCase")]
     TrackStuckEvent {
         guild_id: String,
         track: Track,
         threshold_ms: u64,
     },
+    #[serde(rename_all = "camelCase")]
     WebSocketClosedEvent {
         guild_id: String,
         code: u16,

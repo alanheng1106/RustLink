@@ -177,3 +177,66 @@ sources:
     assert!(!cfg.get_source_list().contains(&"local".to_string()));
     assert!(cfg.get_source_list().contains(&"youtube".to_string()));
 }
+
+#[test]
+fn test_serialize_server_messages() {
+    use rustlink::model::protocol::{CpuStats, MemoryStats, ServerMessage, StatsResponse};
+
+    let stats = StatsResponse {
+        players: 1,
+        playing_players: 1,
+        uptime: 1000,
+        memory: MemoryStats {
+            free: 100,
+            used: 200,
+            allocated: 300,
+            reservable: 400,
+        },
+        cpu: CpuStats {
+            cores: 4,
+            system_load: 0.1,
+            lavalink_load: 0.05,
+        },
+        frame_stats: None,
+    };
+
+    let msg = ServerMessage::Stats(stats);
+    let json = serde_json::to_string(&msg);
+    println!("Serialized Stats: {:?}", json);
+    assert!(json.is_ok());
+
+    let track = rustlink::model::protocol::Track {
+        encoded: "test".to_string(),
+        info: TrackInfo {
+            identifier: "id".to_string(),
+            is_seekable: true,
+            author: "a".to_string(),
+            length: 1000,
+            is_stream: false,
+            position: 0,
+            title: "t".to_string(),
+            uri: None,
+            artwork_url: None,
+            isrc: None,
+            source_name: "http".to_string(),
+        },
+        plugin_info: serde_json::json!({}),
+        user_data: serde_json::json!({}),
+    };
+    let ready = ServerMessage::Ready {
+        resumed: false,
+        session_id: "test-session".to_string(),
+    };
+    let ready_json = serde_json::to_string(&ready).unwrap();
+    println!("Serialized Ready: {}", ready_json);
+
+    let event = ServerMessage::Event(rustlink::model::protocol::ServerEvent::TrackStartEvent {
+        guild_id: "123".to_string(),
+        track,
+    });
+    let event_json = serde_json::to_string(&event).unwrap();
+    println!("Serialized Event: {}", event_json);
+    assert_eq!(ready_json, "{\"op\":\"ready\",\"resumed\":false,\"sessionId\":\"test-session\"}");
+    assert!(event_json.contains("\"type\":\"TrackStartEvent\""));
+    assert!(event_json.contains("\"guildId\":\"123\""));
+}
