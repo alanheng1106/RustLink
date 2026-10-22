@@ -35,9 +35,6 @@ fi
 export CMAKE_GENERATOR="Ninja"
 export CMAKE_MAKE_PROGRAM="$BIN_DIR/ninja"
 
-# Clean any stale build dir from previously failed Make generator runs
-rm -rf target/release/build/libopus_sys* target/debug/build/libopus_sys* 2>/dev/null || true
-
 # 3. Check c++ compiler alias
 if ! command -v c++ &> /dev/null; then
     echo "[-] c++ alias not found. Setting up compiler alias..."
@@ -76,5 +73,20 @@ cat > "$HOME/.config/yt-dlp/config" << 'EOF'
 --remote-components ejs:github
 EOF
 
-echo "=== [RustLink] Starting Cargo build & run ==="
-exec cargo run --release
+BINARY="target/release/rustlink"
+
+# Build only if binary doesn't exist or source files have been updated
+NEED_BUILD=0
+if [ ! -f "$BINARY" ]; then
+    NEED_BUILD=1
+elif [ -n "$(find src Cargo.toml Cargo.lock -newer "$BINARY" 2>/dev/null)" ]; then
+    NEED_BUILD=1
+fi
+
+if [ "$NEED_BUILD" -eq 1 ]; then
+    echo "=== [RustLink] Changes detected, building release binary... ==="
+    cargo build --release
+fi
+
+echo "=== [RustLink] Starting RustLink ==="
+exec "$BINARY"
