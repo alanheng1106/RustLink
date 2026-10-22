@@ -87,7 +87,7 @@ async fn handle_socket(
     if let Ok(json) = serde_json::to_string(&ready_msg) {
         let _ = ws_sender.send(Message::Text(json.into())).await;
     }
-
+ 
     // Send initial Stats immediately
     let initial_stats = state.stats();
     if let Ok(json) = serde_json::to_string(&ServerMessage::Stats(initial_stats)) {

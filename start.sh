@@ -53,10 +53,10 @@ if ! command -v c++ &> /dev/null; then
     echo "[+] c++ compiler alias ready: $(command -v c++ || echo 'fallback')"
 fi
 
-# 4. Check or download portable yt-dlp
-if ! command -v yt-dlp &> /dev/null; then
-    echo "[-] yt-dlp not found. Downloading standalone yt-dlp..."
-    curl -sSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "$BIN_DIR/yt-dlp"
+# 4. Check or download standalone yt-dlp binary (with embedded Python)
+if [ ! -f "$BIN_DIR/yt-dlp" ] || head -n 1 "$BIN_DIR/yt-dlp" 2>/dev/null | grep -q "python"; then
+    echo "[-] Downloading standalone yt-dlp_linux binary (embedded Python runtime)..."
+    curl -sSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux" -o "$BIN_DIR/yt-dlp"
     chmod +x "$BIN_DIR/yt-dlp"
     echo "[+] Standalone yt-dlp installed successfully!"
 fi
