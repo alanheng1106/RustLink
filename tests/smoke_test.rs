@@ -154,3 +154,26 @@ async fn test_youtube_source_input() {
     let input3 = source_manager.create_input(yt_search);
     assert!(input3.is_some());
 }
+
+#[test]
+fn test_config_parsing() {
+    let yaml = r#"
+server:
+  port: 8080
+  address: "127.0.0.1"
+  password: "custom_password"
+
+sources:
+  youtube: true
+  http: true
+  local: false
+  hls: true
+"#;
+
+    let cfg: rustlink::config::AppConfig = serde_yaml::from_str(yaml).expect("Failed to parse config");
+    assert_eq!(cfg.get_port(), 8080);
+    assert_eq!(cfg.get_address(), "127.0.0.1");
+    assert_eq!(cfg.get_password(), "custom_password");
+    assert!(!cfg.get_source_list().contains(&"local".to_string()));
+    assert!(cfg.get_source_list().contains(&"youtube".to_string()));
+}

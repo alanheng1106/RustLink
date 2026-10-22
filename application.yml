@@ -1,0 +1,19 @@
+# =======================================================
+# RustLink Configuration File (Lavalink v4 Compatible)
+# =======================================================
+
+server:
+  port: 2333
+  address: 0.0.0.0
+  password: "youshallnotpass"
+
+# Supported audio sources
+sources:
+  youtube: true
+  http: true
+  local: true
+  hls: true
+
+# Logging level (trace, debug, info, warn, error)
+logging:
+  level: "info"

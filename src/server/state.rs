@@ -15,15 +15,29 @@ pub struct AppState {
     pub sessions: Arc<DashMap<String, Arc<Session>>>,
     pub source_manager: Arc<SourceManager>,
     pub password: Arc<String>,
+    pub enabled_sources: Arc<Vec<String>>,
     pub start_time: Instant,
 }
 
 impl AppState {
     pub fn new(password: String) -> Self {
+        Self::new_with_sources(
+            password,
+            vec![
+                "youtube".to_string(),
+                "http".to_string(),
+                "local".to_string(),
+                "hls".to_string(),
+            ],
+        )
+    }
+
+    pub fn new_with_sources(password: String, sources: Vec<String>) -> Self {
         Self {
             sessions: Arc::new(DashMap::new()),
             source_manager: Arc::new(SourceManager::new()),
             password: Arc::new(password),
+            enabled_sources: Arc::new(sources),
             start_time: Instant::now(),
         }
     }
@@ -77,12 +91,7 @@ impl AppState {
             },
             jvm: "Rust Native (Tokio + Axum)".to_string(),
             lavaplayer: "Songbird 0.6.1 + Symphonia 0.5.5".to_string(),
-            source_managers: vec![
-                "youtube".to_string(),
-                "http".to_string(),
-                "local".to_string(),
-                "hls".to_string(),
-            ],
+            source_managers: (*self.enabled_sources).clone(),
             filters: vec![
                 "volume".to_string(),
                 "equalizer".to_string(),
