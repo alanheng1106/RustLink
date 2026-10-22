@@ -20,7 +20,25 @@ if ! command -v cmake &> /dev/null; then
     echo "[+] Portable CMake installed successfully!"
 fi
 
-# 2. Check c++ compiler alias
+# 2. Check or install portable Ninja (replaces missing 'make')
+if ! command -v ninja &> /dev/null; then
+    echo "[-] ninja not found. Downloading Ninja build tool..."
+    curl -sSL "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip" -o "/tmp/ninja.zip"
+    mkdir -p /tmp/ninja_extract
+    (cd /tmp/ninja_extract && cmake -E tar xf /tmp/ninja.zip && mv ninja "$BIN_DIR/ninja")
+    chmod +x "$BIN_DIR/ninja"
+    ln -sf "$BIN_DIR/ninja" "$BIN_DIR/make"
+    rm -rf /tmp/ninja_extract /tmp/ninja.zip
+    echo "[+] Ninja installed successfully!"
+fi
+
+export CMAKE_GENERATOR="Ninja"
+export CMAKE_MAKE_PROGRAM="$BIN_DIR/ninja"
+
+# Clean any stale build dir from previously failed Make generator runs
+rm -rf target/release/build/libopus_sys* target/debug/build/libopus_sys* 2>/dev/null || true
+
+# 3. Check c++ compiler alias
 if ! command -v c++ &> /dev/null; then
     echo "[-] c++ alias not found. Setting up compiler alias..."
     if command -v g++ &> /dev/null; then
@@ -35,7 +53,7 @@ if ! command -v c++ &> /dev/null; then
     echo "[+] c++ compiler alias ready: $(command -v c++ || echo 'fallback')"
 fi
 
-# 3. Check or download portable yt-dlp
+# 4. Check or download portable yt-dlp
 if ! command -v yt-dlp &> /dev/null; then
     echo "[-] yt-dlp not found. Downloading standalone yt-dlp..."
     curl -sSL "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" -o "$BIN_DIR/yt-dlp"
